@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project>	
+	<!--
+		A project has a number of deployement tasks that are executed in order.
+		Each task has a type (export, replace, ant, rsync, etc.) and one or more
+		targets. When the a deployment is started a target is specified and tasks
+		that do not include the specified target are skipped.
+	-->
+
+	<!-- 
+		Firstly export the project from the svn repository, if the 'abs' parameter 
+		is not set, then /tags/{RELEASE} will be appended to the supplied source.
+		When 'abs' is set, the source is passed to svn unchanged. This would
+		normally be used to include external libraries.
+	--> 
+	<task target="pre,prod" type="export">
+		<param name="source" value="{SVN_PATH}" />
+		<!-- 
+		{SESSION_ROOT} is replaced with a unique temporary path for this
+		session. The target is where the svn will be exported to.
+		-->
+		<param name="target" value="{SESSION_ROOT}/{PROJECT}/" />
+	</task>
+	
+	<!--
+		If required you can perform any number of string replacements before you
+		deploy, the 'file' parameter specifies the target file, 'search' what is being 
+		searched for, and 'replace' what to replace it with.
+	-->
+	<task target="pre" type="replace">
+		<param name="file" value="{SESSION_ROOT}/{PROJECT}/example.php" />
+		<param name="search" value='define("ENV","dev");' />
+		<param name="replace" value='define("ENV","pre");' />
+	</task>
+	
+	<!--
+		Generally, after processing the exported code you will rsync it to prdnfs054
+		where it is queued for deployment to either the pre or prod environments. You
+		have to specify a source and a target, ensuring that both include a final '/'.
+		Both are standard rsync paths.
+	-->
+	<task target="pre" type="rsync">
+		<param name="source" value="{SESSION_ROOT}/{PROJECT}/" />
+		<!--
+			This is the rsync target. For deployment, this should be on prdnfs054
+			and use the deploy_dev user for pre and deploy_ops for prod. ie. to
+			push this project to pre use:
+
+			deploy_dev@prdnfs054:/home/deploy_dev/php/{PROJECT}/
+
+			for prod:
+
+			deploy_ops@prdnfs054:/home/deploy_ops/php/{PROJECT}/
+		-->
+		<param name="target" value="{RSYNC_TARGET}" /> 
+	</task>
+	
+	<!--
+		The replicate tasks are only executed on prdnfs054 and specify where the 
+		files are to be deployed. This effectively a standard rsync task, but with the
+		exception that after the last replicate task is completed, the source files
+		are deleted; in this case '/home/deploy_dev/php/{PROJECT}/'.
+
+		You will need to create a separate replicate task for each of the desired
+		final endpoints for your project in both pre and prod environments, this
+		could include for example each of the live webservers.
+	-->
+	<task target="replicate-pre" type="replicate">
+		<param name="source" value="/home/deploy_dev/php/{PROJECT}/" />
+		<param name="target" value="{RSYNC_TARGET}" />
+	</task>
+	
+</project>
